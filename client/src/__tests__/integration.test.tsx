@@ -15,11 +15,7 @@ jest.mock("../service/auth/auth", () => ({
 }));
 
 import SignIn from "../app/signin/page";
-import { authService } from "../service/auth/auth";
 import { saveUser, getUser } from "../lib/localStorage";
-import type { AxiosResponse } from "axios";
-
-const mockAuthService = authService as jest.Mocked<typeof authService>;
 
 function getSubmitButton() {
   return screen
@@ -35,7 +31,7 @@ test("SignIn: deve exibir erro ao submeter formulário vazio", async () => {
   });
 });
 
-test("localStorage: usuário salvo deve poder ser recuperado (BUG)", () => {
+test("localStorage: usuário salvo deve poder ser recuperado", () => {
   localStorage.clear();
   saveUser({ id: 1, email: "heitor@teste.com" });
   const recuperado = getUser();
