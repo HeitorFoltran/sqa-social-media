@@ -1,0 +1,18 @@
+{
+  "name": "sqa-social-media-tests",
+  "version": "1.0.0",
+  "description": "Testes E2E e de API (caixa-preta) do projeto SQA Social Media - Atividade 5",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e",
+    "test:headed": "playwright test --project=e2e --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^20.0.0"
+  }
+}
