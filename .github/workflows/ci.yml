@@ -21,9 +21,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Executar testes da API
+      - name: Executar testes da API (H2 in-memory)
         working-directory: api
-        run: ./mvnw test --no-transfer-progress
+        run: chmod +x mvnw && ./mvnw test --no-transfer-progress
 
   unit-tests-client:
     name: Testes Unitários
@@ -80,7 +80,7 @@ jobs:
 
       - name: Build da API (sem rodar testes novamente)
         working-directory: api
-        run: ./mvnw package -DskipTests --no-transfer-progress
+        run: chmod +x mvnw && ./mvnw package -DskipTests --no-transfer-progress
 
       - name: Iniciar API em background
         working-directory: api
