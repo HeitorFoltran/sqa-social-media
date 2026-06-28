@@ -1,0 +1,176 @@
+name: CI - Suíte de Testes
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  unit-tests-api:
+    name: Testes Unitários
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Executar testes da API
+        working-directory: api
+        run: ./mvnw test --no-transfer-progress
+
+  unit-tests-client:
+    name: Testes Unitários
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Instalar dependências do client
+        working-directory: client
+        run: npm ci
+
+      - name: Executar testes Jest
+        working-directory: client
+        run: npm test -- --passWithNoTests
+
+  e2e-tests:
+    name: Testes E2E e API
+    runs-on: ubuntu-latest
+    needs: [unit-tests-api, unit-tests-client]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: social_media
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build da API (sem rodar testes novamente)
+        working-directory: api
+        run: ./mvnw package -DskipTests --no-transfer-progress
+
+      - name: Iniciar API em background
+        working-directory: api
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/social_media
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+        run: |
+          nohup java -jar target/*.jar \
+            --spring.datasource.url=jdbc:mysql://localhost:3306/social_media \
+            --spring.datasource.username=root \
+            --spring.datasource.password=root \
+            > /tmp/api.log 2>&1 &
+          echo "API_PID=$!" >> $GITHUB_ENV
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Instalar dependências do client
+        working-directory: client
+        run: npm ci
+
+      - name: Build do client
+        working-directory: client
+        run: npm run build
+
+      - name: Iniciar client em background
+        working-directory: client
+        run: |
+          nohup npm run start > /tmp/client.log 2>&1 &
+          echo "CLIENT_PID=$!" >> $GITHUB_ENV
+
+      - name: Instalar dependências dos testes E2E
+        working-directory: tests
+        run: npm ci
+
+      - name: Instalar browsers do Playwright
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Aguardar API ficar pronta
+        run: |
+          echo "Aguardando API em :8080..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health 2>/dev/null || \
+               curl -sf http://localhost:8080/api/auth/check 2>/dev/null || \
+               curl -o /dev/null -s -w "%{http_code}" http://localhost:8080 | grep -qv "000"; then
+              echo "API pronta!"
+              break
+            fi
+            echo "  tentativa $i/30..."
+            sleep 5
+          done
+
+      - name: Aguardar Client ficar pronto
+        run: |
+          echo "Aguardando Client em :3000..."
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Client pronto!"
+              break
+            fi
+            echo "  tentativa $i/24..."
+            sleep 5
+          done
+
+      - name: Executar testes Playwright
+        working-directory: tests
+        env:
+          API_URL: http://localhost:8080
+          CLIENT_URL: http://localhost:3000
+          CI: true
+        run: npx playwright test
+
+      - name: Upload do relatório Playwright (falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/playwright-report/
+          retention-days: 7
+
+      - name: Logs da API (falha)
+        if: failure()
+        run: cat /tmp/api.log || true
+
+      - name: Logs do Client (falha)
+        if: failure()
+        run: cat /tmp/client.log || true
