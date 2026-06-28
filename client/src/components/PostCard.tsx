@@ -80,11 +80,29 @@ export default function PostCard({
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           alignItems: "center",
           marginTop: "1rem",
         }}
       >
+        <div
+          aria-label="reações do post"
+          style={{
+            display: "flex",
+            gap: "1rem",
+            color: "var(--foreground)",
+            opacity: 0.75,
+            fontSize: "0.9rem",
+          }}
+        >
+          <span aria-label={`${post.likes} curtidas`}>
+            👍 {post.likes}
+          </span>
+          <span aria-label={`${post.dislikes} descurtidas`}>
+            👎 {post.dislikes}
+          </span>
+        </div>
+
         <button
           onClick={handleLike}
           disabled={isLoading}
@@ -103,9 +121,7 @@ export default function PostCard({
             opacity: isLoading ? 0.7 : 1,
           }}
           onMouseOver={(e) => {
-            if (!isLoading) {
-              e.currentTarget.style.transform = "scale(1.05)";
-            }
+            if (!isLoading) e.currentTarget.style.transform = "scale(1.05)";
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.transform = "scale(1)";
